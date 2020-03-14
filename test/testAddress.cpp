@@ -22,9 +22,9 @@ namespace Gigamonkey::Bitcoin {
         
         signature arbitrary{bytes("It's not easy being green.")};
         
-        secret key{"0x00000000000000000000000000000000000000000000000000000000000101a7"};
+        secret key{secret::test, secp256k1::secret{secp256k1::coordinate{"0x00000000000000000000000000000000000000000000000000000000000101a7"}}};
         
-        std::cout << "using key " << key << " for testing addresses" << std::endl;
+        std::cout << "using key " << key.Secret << " for testing addresses" << std::endl;
         
         EXPECT_TRUE(key.valid());
         
@@ -42,8 +42,8 @@ namespace Gigamonkey::Bitcoin {
         
         bytes redeem_p2pk = pay_to_pubkey::redeem(arbitrary);
         
-        address address_compressed{pubkey_compressed};
-        address address_uncompressed{pubkey_uncompressed};
+        address address_compressed{address::test, pubkey_compressed};
+        address address_uncompressed{address::test, pubkey_uncompressed};
         
         std::cout << "attempting to pay to address with address compressed " << address_compressed << std::endl;
         std::cout << "attempting to pay to address with address uncompressed " << address_uncompressed << std::endl;
@@ -55,21 +55,22 @@ namespace Gigamonkey::Bitcoin {
         
         bytes redeem_p2pkh_uncompressed = pay_to_address::redeem(arbitrary, pubkey_uncompressed);
         
-        EXPECT_TRUE(evaluate_script(script_p2pk_compressed, redeem_p2pk).Valid);
-        EXPECT_TRUE(evaluate_script(script_p2pkh_compressed, redeem_p2pkh_compressed).Valid);
+        EXPECT_TRUE(evaluate_script(script_p2pk_compressed, redeem_p2pk).valid());
+        EXPECT_TRUE(evaluate_script(script_p2pkh_compressed, redeem_p2pkh_compressed).valid());
         
-        EXPECT_TRUE(evaluate_script(script_p2pk_uncompressed, redeem_p2pk).Valid);
-        EXPECT_TRUE(evaluate_script(script_p2pkh_uncompressed, redeem_p2pkh_uncompressed).Valid);
+        EXPECT_TRUE(evaluate_script(script_p2pk_uncompressed, redeem_p2pk).valid());
+        EXPECT_TRUE(evaluate_script(script_p2pkh_uncompressed, redeem_p2pkh_uncompressed).valid());
         
-        EXPECT_FALSE(evaluate_script(script_p2pk_compressed, redeem_p2pkh_compressed).Valid);
-        EXPECT_FALSE(evaluate_script(script_p2pkh_compressed, redeem_p2pk).Valid);
+        EXPECT_FALSE(evaluate_script(script_p2pk_compressed, redeem_p2pkh_compressed).valid());
+        EXPECT_FALSE(evaluate_script(script_p2pkh_compressed, redeem_p2pk).valid());
         
-        EXPECT_FALSE(evaluate_script(script_p2pk_uncompressed, redeem_p2pkh_uncompressed).Valid);
-        EXPECT_FALSE(evaluate_script(script_p2pkh_uncompressed, redeem_p2pk).Valid);
+        EXPECT_FALSE(evaluate_script(script_p2pk_uncompressed, redeem_p2pkh_uncompressed).valid());
+        EXPECT_FALSE(evaluate_script(script_p2pkh_uncompressed, redeem_p2pk).valid());
         
-        EXPECT_FALSE(evaluate_script(script_p2pkh_compressed, redeem_p2pkh_uncompressed).Valid);
+        EXPECT_FALSE(evaluate_script(script_p2pkh_compressed, redeem_p2pkh_uncompressed).valid());
         
-        EXPECT_FALSE(evaluate_script(script_p2pkh_uncompressed, redeem_p2pkh_compressed).Valid);
+        EXPECT_FALSE(evaluate_script(script_p2pkh_uncompressed, redeem_p2pkh_compressed).valid());
+        
     }
 
 }
