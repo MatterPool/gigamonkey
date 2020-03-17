@@ -7,7 +7,7 @@
 #include "policy/policy.h"
 
 namespace Gigamonkey::Bitcoin {
-    /*
+    
     evaluated evaluate_script(script in, script out, const BaseSignatureChecker& checker) {
         evaluated Response;
         std::optional<bool> response = VerifyScript(
@@ -23,17 +23,18 @@ namespace Gigamonkey::Bitcoin {
             Response.Return = *response;
         } 
         return Response;
-    }*/
+    }
     
     evaluated evaluate_script(script in, script out) {
-        throw data::method::unimplemented{"evaluate_script"};
-        //return evaluate_script(in, out, /* Need test signature checker. */);
+        //throw data::method::unimplemented{"evaluate_script"};
+        return evaluate_script(in, out, /* Need test signature checker. */);
     }
     
     evaluated evaluate_script(script in, script out, bytes_view transaction, uint32 index, satoshi amount) {
-        throw data::method::unimplemented{"evaluate_script"};
-        //CTransaction tx(transaction);
-        //return evaluate_script(in, out, TransactionSignatureChecker(tx), index, amount);
+        // transaction needs to be made into some stream but I don't know what that is. It's a
+        // template parameter in this constructor. 
+        CTransaction tx(deserialize_type, transaction); 
+        return evaluate_script(in, out, TransactionSignatureChecker(tx, index, amount));
     }
 
 }

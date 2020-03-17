@@ -191,11 +191,11 @@ namespace Gigamonkey::Boost {
             
             std::cout << "input scripts serialize to " << serialized_input_scripts.rest() << std::endl;
             std::cout << "output scripts serialize to " << serialized_output_scripts.rest() << std::endl;
-            /*
+            
             if (!dot_cross([](bytes_view in, bytes_view out) {
                     return Bitcoin::evaluate_script(in, out).valid();
                 }, serialized_input_scripts.rest(), serialized_output_scripts.rest())) 
-                return {"Boost scripts are not valid."};*/
+                return {"Boost scripts are not valid."};
             
             return {};
         }
