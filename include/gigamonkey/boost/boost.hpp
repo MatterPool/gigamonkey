@@ -222,6 +222,7 @@ namespace Gigamonkey {
                 uint32_little extra_nonce_1) : Type{Boost::contract}, 
                 Signature{signature}, 
                 Pubkey{pubkey}, 
+                Nonce{nonce}, 
                 Timestamp{timestamp},
                 ExtraNonce2{extra_nonce_2},
                 ExtraNonce1{extra_nonce_1},
@@ -371,7 +372,7 @@ namespace Gigamonkey {
         };
         
         inline work::proof work_proof(output_script out, input_script in) {
-            return out.Type == invalid || in.Type == invalid || in.Type != out.Type ? work::proof{} : 
+            return out.Type == invalid || in.Type != out.Type ? work::proof{} : 
                 work::proof{job{out, out.Type == bounty ? in.MinerAddress : out.MinerAddress}.Puzzle, 
                     work::solution{in.Timestamp, in.Nonce, write(12, in.ExtraNonce1, in.ExtraNonce2)}};
         }

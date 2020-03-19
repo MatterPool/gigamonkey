@@ -8,10 +8,20 @@ namespace Gigamonkey::Bitcoin {
     // exponential format and converts it to expanded format. 
     const program expand_target = program{
         OP_SIZE, push_value(4), OP_EQUALVERIFY, push_value(3), OP_SPLIT,
-        OP_DUP, push_value(3), OP_GREATERTHANOREQUAL, OP_VERIFY,
-        OP_DUP, push_value(32), OP_LESSTHANOREQUAL, OP_VERIFY, OP_TOALTSTACK,
+        OP_DUP, OP_BIN2NUM, push_value(3), push_value(33), OP_WITHIN, OP_VERIFY, OP_TOALTSTACK,
+        OP_DUP, OP_BIN2NUM, OP_0, OP_GREATERTHAN, OP_VERIFY, // significant must be positive
         push_hex("0000000000000000000000000000000000000000000000000000000000"), 
-        OP_CAT, OP_FROMALTSTACK, push_value(3), OP_SUB, OP_RSHIFT};
+        OP_CAT, OP_FROMALTSTACK, push_value(3), OP_SUB, push_value(8), OP_MUL, OP_RSHIFT};
+    
+    // check top stack element for positive zero (as opposed to negative zero) 
+    // and replace it with true or false. 
+    const program check_positive_zero = program{OP_DUP, OP_NOTIF, OP_1, OP_RSHIFT, 
+        OP_NOTIF, OP_TRUE, OP_ELSE, OP_FALSE, OP_ENDIF, OP_ELSE, OP_DROP, OP_FALSE, OP_ENDIF};
+    
+    const program check_negative_zero = program{OP_DUP, OP_NOTIF, OP_1, OP_RSHIFT, 
+        push_hex("40"), OP_EQUAL, OP_IF, OP_TRUE, OP_ELSE, OP_FALSE, OP_ENDIF, OP_ELSE, OP_DROP, OP_FALSE, OP_ENDIF};
+    
+    const program ensure_positive = program{push_hex("00"), OP_CAT, OP_BIN2NUM};
 }
 
 namespace Gigamonkey::Boost {
@@ -91,8 +101,8 @@ namespace Gigamonkey::Boost {
             push{x.AdditionalData}, OP_CAT, OP_SWAP, 
             // copy mining pool’s pubkey hash to alt stack. A copy remains on the stack.
             push{5}, OP_ROLL, OP_DUP, OP_TOALTSTACK, OP_CAT,              
-            // expand compact form of target and push to altstack. 
-            push{2}, OP_PICK, expand_target, OP_TOALTSTACK, 
+            // copy target and push to altstack. 
+            push{2}, OP_PICK, OP_TOALTSTACK, 
             push{5}, OP_ROLL, OP_SIZE, push{4}, OP_EQUALVERIFY, OP_CAT,   // check size of extra_nonce_1
             push{5}, OP_ROLL, OP_SIZE, push{8}, OP_EQUALVERIFY, OP_CAT,   // check size of extra_nonce_2
             // create metadata document and hash it.
@@ -101,11 +111,15 @@ namespace Gigamonkey::Boost {
             OP_SWAP, OP_SIZE, push{4}, OP_EQUALVERIFY, OP_CAT,   // check size of timestamp.
             OP_FROMALTSTACK, OP_CAT,                             // attach target
             // check size of nonce. Boost POW string is constructed. 
-            OP_SWAP, OP_SIZE, push{4}, OP_EQUALVERIFY, OP_CAT,            
+            OP_SWAP, OP_SIZE, push{4}, OP_EQUALVERIFY, OP_CAT,  
+            // Take hash of work string and ensure that it is positive and minimally encoded.
+            OP_HASH256, ensure_positive, 
+            // Get target, transform to expanded form, and ensure that it is positive and minimally encoded.
+            OP_FROMALTSTACK, expand_target, ensure_positive, 
             // check that the hash of the Boost POW string is less than the target
-            OP_HASH256, OP_FROMALTSTACK, OP_LESSTHAN, OP_VERIFY,
+            OP_LESSTHAN, OP_VERIFY,
             // check that the given address matches the pubkey and check signature.
-            OP_DUP, OP_HASH256, OP_FROMALTSTACK, OP_EQUALVERIFY, OP_CHECKSIG};
+            OP_DUP, OP_HASH160, OP_FROMALTSTACK, OP_EQUALVERIFY, OP_CHECKSIG};
         
         if (!output_script_pattern.match(b)) return {};
         
@@ -174,7 +188,7 @@ namespace Gigamonkey::Boost {
             // copy mining pool’s pubkey hash to alt stack. A copy remains on the stack.
             OP_5, OP_ROLL, OP_DUP, OP_TOALTSTACK, OP_CAT,              
             // expand compact form of target and push to altstack. 
-            OP_2, OP_PICK, expand_target, OP_TOALTSTACK, 
+            OP_2, OP_PICK, OP_TOALTSTACK, 
             OP_5, OP_ROLL, OP_SIZE, OP_4, OP_EQUALVERIFY, OP_CAT,   // check size of extra_nonce_1
             OP_5, OP_ROLL, OP_SIZE, OP_8, OP_EQUALVERIFY, OP_CAT,   // check size of extra_nonce_2
             // create metadata document and hash it.
@@ -183,11 +197,15 @@ namespace Gigamonkey::Boost {
             OP_SWAP, OP_SIZE, OP_4, OP_EQUALVERIFY, OP_CAT,         // check size of timestamp.
             OP_FROMALTSTACK, OP_CAT,                                // attach target
             // check size of nonce. Boost POW string is constructed. 
-            OP_SWAP, OP_SIZE, OP_4, OP_EQUALVERIFY, OP_CAT,            
+            OP_SWAP, OP_SIZE, OP_4, OP_EQUALVERIFY, OP_CAT,
+            // Take hash of work string and ensure that it is positive and minimally encoded.
+            OP_HASH256, ensure_positive, 
+            // Get target, transform to expanded form, and ensure that it is positive and minimally encoded.
+            OP_FROMALTSTACK, expand_target, ensure_positive, 
             // check that the hash of the Boost POW string is less than the target
-            OP_HASH256, OP_FROMALTSTACK, OP_LESSTHAN, OP_VERIFY,
+            OP_LESSTHAN, OP_VERIFY,
             // check that the given address matches the pubkey and check signature.
-            OP_DUP, OP_HASH256, OP_FROMALTSTACK, OP_EQUALVERIFY, OP_CHECKSIG);
+            OP_DUP, OP_HASH160, OP_FROMALTSTACK, OP_EQUALVERIFY, OP_CHECKSIG);
         
         return compile(boost_output_script);
     }
@@ -208,10 +226,10 @@ namespace Gigamonkey::Boost {
     
     uint160 job::miner_address() const {
         size_t puzzle_header_size = Puzzle.Header.size();
-        if (puzzle_header_size < 28) return 0;
+        if (puzzle_header_size < 20) return 0;
         uint160 x;
-        std::copy(Puzzle.Header.end() - 28, 
-                  Puzzle.Header.end() - 8, 
+        std::copy(Puzzle.Header.end() - 20, 
+                  Puzzle.Header.end(), 
                   x.begin());
         return x;
     }
@@ -273,8 +291,8 @@ std::ostream& operator<<(std::ostream& o, const Gigamonkey::Boost::output_script
     using namespace Gigamonkey::Boost;
     if (s.Type == invalid) return o << "BoostOutputScript{Type : invalid}";
     o << "BoostOutputScript{Type : ";
-    if (s.Type == bounty) o << "bounty, MinerAddress : " << s.MinerAddress;
-    else o << "contract";
+    if (s.Type == contract) o << "contract, MinerAddress : " << s.MinerAddress;
+    else o << "bounty";
     return o << 
         ", Category : " << s.Category << 
         ", Content : " << s.Content << 

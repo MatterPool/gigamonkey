@@ -63,7 +63,7 @@ namespace Gigamonkey::Boost {
         static bool test_equal(list<X> a, list<X> b) {
             if (a.size() != b.size()) return false;
             while(!a.empty()) {
-                if (!a.first() == b.first()) return false;
+                if (a.first() != b.first()) return false;
                 a = a.rest();
                 b = b.rest();
             }
@@ -108,12 +108,12 @@ namespace Gigamonkey::Boost {
         static job get_job(test_input);*/
         
         class test_case {
-            test_case(job j, output_script x, Bitcoin::secret key, uint32_little n) : 
-                Job{j}, Script{x}, Key{key}, ExtraNonce2{n} {}
+            test_case(job j, output_script x, Bitcoin::secret key, uint32_little n1, uint64_little n2) : 
+                Job{j}, Script{x}, Key{key}, ExtraNonce1{n1}, ExtraNonce2{n2} {}
             
-            static test_case build(output_script o, uint64 key, uint32_little extra_nonce) {
+            static test_case build(output_script o, uint64 key, uint32_little n1, uint64_little n2) {
                 Bitcoin::secret s(Bitcoin::secret::main, secp256k1::secret(secp256k1::coordinate(key)));
-                return test_case{job{o, s.address().Digest}, o, s, extra_nonce};
+                return test_case{job{o, s.address().Digest}, o, s, n1, n2};
             }
             
             static test_case build(Boost::type type, 
@@ -123,24 +123,26 @@ namespace Gigamonkey::Boost {
                 uint32_little user_nonce, 
                 bytes data, 
                 uint64 key, 
-                uint32_little extra_nonce) { 
+                uint32_little n1, 
+                uint64_little n2) { 
                 Bitcoin::secret s(Bitcoin::secret::main, secp256k1::secret(secp256k1::coordinate(key)));
                 uint160 address = s.address().Digest;
                 
                 return test_case(
                     job(type, 1, content, target, tag, user_nonce, data, address), 
                     output_script(type, 1, content, target, tag, user_nonce, data, address), 
-                    s, extra_nonce);
+                    s, n1, n2);
             }
             
         public:
             job Job;
             output_script Script;
             Bitcoin::secret Key;
+            uint32_little ExtraNonce1;
             uint64_little ExtraNonce2;
             
-            test_case(output_script o, uint64 key, uint32_little extra_nonce) : 
-                test_case(build(o, key, extra_nonce)) {}
+            test_case(output_script o, uint64 key, uint32_little n1, uint64_little n2) : 
+                test_case(build(o, key, n1, n2)) {}
             
             test_case(Boost::type type, 
                 uint256 content, 
@@ -149,8 +151,9 @@ namespace Gigamonkey::Boost {
                 uint32_little user_nonce, 
                 bytes data, 
                 uint64 key, 
-                uint32_little extra_nonce) : 
-                test_case(build(type, content, target, tag, user_nonce, data, key, extra_nonce)) {}
+                uint32_little n1, 
+                uint64_little n2) : 
+                test_case(build(type, content, target, tag, user_nonce, data, key, n1, n2)) {}
         };
         
     public:
@@ -188,14 +191,21 @@ namespace Gigamonkey::Boost {
                     return input_script(o);
                 }, serialized_input_scripts))) 
                 return {"could not serialize and deserialize input scripts."};
-            
+            /*
             std::cout << "input scripts serialize to " << serialized_input_scripts.rest() << std::endl;
-            std::cout << "output scripts serialize to " << serialized_output_scripts.rest() << std::endl;
+            std::cout << "output scripts serialize to " << serialized_output_scripts.rest() << std::endl;*/
             
+            auto results = map_thread<bool>([](const input_script& in, const output_script& out) -> bool {
+                Bitcoin::evaluated eval = Bitcoin::evaluate_script(in.write(), out.write()); 
+                if (!eval.valid()) std::cout << "Script failed: " << eval.Error << std::endl;
+                else std::cout << "Script succeeded!" << std::endl;
+                return eval.valid();
+            }, input_scripts.rest(), output_scripts.rest());
+            /*
             if (!dot_cross([](bytes_view in, bytes_view out) {
                     return Bitcoin::evaluate_script(in, out).valid();
-                }, serialized_input_scripts.rest(), serialized_output_scripts.rest())) 
-                return {"Boost scripts are not valid."};
+                }, serialized_input_scripts, serialized_output_scripts)) 
+                return {"Boost scripts are not valid."};*/
             
             return {};
         }
@@ -238,7 +248,7 @@ namespace Gigamonkey::Boost {
                 test_case{
                     output_script{}, 
                     InitialKey, 
-                    233} << 
+                    97979, 302203233} << 
                 // We vary test cases over bounty/contract and over contents.
                 test_case{
                     Boost::bounty, 
@@ -248,7 +258,7 @@ namespace Gigamonkey::Boost {
                     UserNonce, 
                     AdditionalData,
                     InitialKey + 1, 
-                    234} << 
+                    97980, 302203234} << 
                 test_case{
                     Boost::contract, 
                     ContentsA, 
@@ -256,7 +266,7 @@ namespace Gigamonkey::Boost {
                     UserNonce, 
                     AdditionalData, 
                     InitialKey + 2, 
-                    235} << 
+                    97981, 302203235} << 
                 test_case{
                     Boost::bounty, 
                     ContentsB, 
@@ -264,7 +274,7 @@ namespace Gigamonkey::Boost {
                     UserNonce, 
                     AdditionalData,
                     InitialKey + 3, 
-                    236} << 
+                    97982, 302203236} << 
                 test_case{
                     Boost::contract, 
                     ContentsB, 
@@ -272,7 +282,7 @@ namespace Gigamonkey::Boost {
                     UserNonce, 
                     AdditionalData,
                     InitialKey + 4, 
-                    237};
+                    97983, 302203237};
             
             std::cout << "Boost test : done reading in test cases." << std::endl;
             // here is the list of jobs. 
@@ -289,6 +299,7 @@ namespace Gigamonkey::Boost {
             const list<work::puzzle> puzzles = data::for_each([](const test_case t) -> work::puzzle {
                 return t.Job.Puzzle;
             }, test_cases);
+            
             /*std::cout << "Boost test : making stratum jobs" << std::endl;
             // Here are the stratum jobs. 
             auto Stratum_jobs = data::for_each([JobID, WorkerName, Start](job j) -> Stratum::job {
@@ -300,9 +311,11 @@ namespace Gigamonkey::Boost {
             }, jobs);*/
             
             // finally we generate solutions. 
+            std::cout << "Boost test : generating solutions." << std::endl;
             auto proofs = data::for_each([Start](const test_case t) -> work::proof {
-                return work::cpu_solve(t.Job.Puzzle, work::solution(Start, 0, bytes_view(t.ExtraNonce2)));
+                return work::cpu_solve(t.Job.Puzzle, work::solution(Start, 0, write(12, t.ExtraNonce1, t.ExtraNonce2)));
             }, test_cases);
+            std::cout << "Boost test : done generating solutions." << std::endl;
             
             // here are the input scripts. 
             auto input_scripts = map_thread<input_script>([Signature](const test_case t, work::proof i) -> input_script {
@@ -316,6 +329,19 @@ namespace Gigamonkey::Boost {
                     x.Solution.Timestamp, 
                     x.Solution.Nonce};
             }, proofs);
+            
+            std::cout << "Boost test output scripts: " << output_scripts << std::endl << std::endl;
+            std::cout << "Boost test input scripts: " << input_scripts << std::endl << std::endl;
+            std::cout << "Bost test proofs: " << proofs << std::endl << std::endl;
+            std::cout << "Bost test metadata pages: " << data::for_each([](const work::proof& p) -> bytes {
+                return p.meta();
+            }, proofs) << std::endl << std::endl;
+            std::cout << "Bost test work strings: " << data::for_each([](const work::proof& p) -> work::string {
+                return p.string();
+            }, proofs) << std::endl << std::endl;
+            std::cout << "Bost test work string hashes: " << data::for_each([](const work::proof& p) -> uint256 {
+                return p.string().hash();
+            }, proofs) << std::endl << std::endl;
             
             // Test 1: whether jobs, output scripts, Stratum jobs, and proofs have the same value of valid/invalid. 
             
@@ -335,20 +361,22 @@ namespace Gigamonkey::Boost {
                     return j.valid();
                 }, Stratum_jobs)))
                 return {"jobs and Stratum jobs do not have equal validity."};*/
+            
             std::cout << "Boost test 1: checking validity of proofs." << std::endl;
             if (!test_equal(job_validity, 
                 data::for_each([](work::proof p) -> bool {
                     return p.valid();
                 }, proofs))) 
                 return {"proofs are not valid."};
-            /*
-            std::cout << "Boost test 2: checking validity of output scripts." << std::endl;
+            
             // Test 2: output scripts should be equal to those reconstructed from jobs. 
+            std::cout << "Boost test 2: checking validity of output scripts." << std::endl;
             if (!test_orthogonal(output_scripts, 
                 data::for_each([](const job j) -> output_script {
                     return j.output_script();
                 }, jobs))) 
-                return {"could not reconstruct output scripts from jobs"};*/
+                return {"could not reconstruct output scripts from jobs"};
+            
             /*
             // Test 3: puzzles should be equal to those reconstructed from Stratum jobs. 
             if (!test_orthogonal(puzzles, 
@@ -392,9 +420,9 @@ namespace Gigamonkey {
         
         std::cout << "Boost Test setup" << std::endl;
 
-        const digest256 ContentsA = Bitcoin::hash256(std::string{} + 
+        const digest256 ContentsA = sha256(std::string{} + 
             "Capitalists will always be able to expend more energy that socialists.");
-        const digest256 ContentsB = Bitcoin::hash256(std::string{} + 
+        const digest256 ContentsB = sha256(std::string{} + 
             "It's very difficult to censor a message that has lots of proof-of-work because everyone wants to see it."); 
         const uint32_little UserNonce{77777777}; 
         const Stratum::id JobID{0}; 
@@ -404,7 +432,7 @@ namespace Gigamonkey {
         Boost::tests::response r;
         
         EXPECT_NO_THROW(r = Boost::tests{}(
-            ContentsA, ContentsB, work::SuccessSixteenth, UserNonce, JobID, WorkerName, Start, 0, 13034));
+            ContentsA, ContentsB, work::target{32, 0x0080ff}, UserNonce, JobID, WorkerName, Start, 0, 13034));
         
         if (!r.Success) std::cout << "Tests failed because: " << r.Reason << std::endl;
         else std::cout << "Tests passed!!!!!" << std::endl;
