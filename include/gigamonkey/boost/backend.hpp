@@ -145,60 +145,6 @@ namespace Gigamonkey::Boost {
         }
     };
     
-    struct in_progress {
-        struct job {
-            digest256 ID;
-            Boost::job Job;
-            Bitcoin::secret Secret;
-            
-            bool valid() const {
-                return Job.valid() && Secret.valid();
-            }
-            
-            job() : Job{}, Secret{} {}
-            job(const Boost::job& j, const Bitcoin::secret& s) : Job{j}, Secret{s} {}
-        };
-        
-        struct worker {
-            digest256 ID;
-            virtual hashpower estimateHashpower() = 0;
-        };
-        
-        struct completed {
-            list<Bitcoin::spendable> Spendable;
-            
-            // workers that need to be reassigned. 
-            list<worker&> Workers;
-            
-            completed() : Spendable{}, Workers{} {}
-            completed(list<Bitcoin::spendable> v, list<worker&> w) : Spendable{v}, Workers{w} {}
-        };
-        
-        // max number of elements in queue. 
-        uint32 MaxSize;
-        
-        // max total difficulty in queue. 
-        double MaxDifficulty;
-        
-        // minimum expected time per job. 
-        uint32 MinTime; 
-        
-        std::list<std::pair<job, list<worker&>>> Jobs;
-        
-        // script ids associated with outpoints.
-        std::map<uint256, list<Bitcoin::outpoint>> Entries;
-        
-        void assign(worker& w);
-        
-        // if a solution is not given, it is assumed that the output was 
-        // redeemed by someone else. 
-        completed complete(const uint256& id, const work::solution& x);
-        completed complete(const uint256& id);
-        
-    private: 
-        virtual job get() = 0;
-    };
-    
     struct ideal_hashpower_assignment {
         constexpr static double BlocksMinimum{.25};
         
@@ -210,6 +156,8 @@ namespace Gigamonkey::Boost {
             profitability blocks, 
             profitability boost_bounty, 
             profitability boost_contract);
+        
+        ideal_hashpower_assignment() : Blocks{1}, BoostBounty{0}, BoostContract{0} {}
     };
     
     struct assignments {
